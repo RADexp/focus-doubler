@@ -3,10 +3,11 @@ import EntryList from "./EntryList";
 
 export default function SummaryScreen({
   record,
-  onNewSession,
+  onBreak,
 }: {
   record: SessionRecord;
-  onNewSession: () => void;
+  /** Dalej: ekran przerwy (stamtąd start kolejnej sesji). */
+  onBreak: () => void;
 }) {
   return (
     <>
@@ -32,8 +33,8 @@ export default function SummaryScreen({
           </div>
         </div>
         <div style={{ marginTop: 18 }}>
-          <button className="btn btn-primary" onClick={onNewSession}>
-            + Nowa sesja
+          <button className="btn btn-primary" onClick={onBreak}>
+            ◈ Przejdź do przerwy
           </button>
         </div>
       </div>

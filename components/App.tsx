@@ -30,13 +30,14 @@ import {
   saveSessions,
   saveSoundEnabled,
 } from "@/lib/storage";
+import BreakScreen, { type BreakView } from "./BreakScreen";
 import CheckinModal from "./CheckinModal";
 import History from "./History";
 import SessionScreen from "./SessionScreen";
 import SetupScreen from "./SetupScreen";
 import SummaryScreen from "./SummaryScreen";
 
-type Phase = "setup" | "session" | "summary";
+type Phase = "setup" | "session" | "summary" | "break";
 
 interface Live {
   task: string;
@@ -60,6 +61,13 @@ interface Live {
  */
 const MIN_FINAL_CHECKIN_RATIO = 0.05;
 
+interface Brk {
+  totalSec: number;
+  leftSec: number;
+  /** Czas przerwy dobiegł końca — czekamy na powrót do pracy. */
+  finished: boolean;
+}
+
 export default function App() {
   const [phase, setPhase] = useState<Phase>("setup");
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
@@ -74,6 +82,8 @@ export default function App() {
 
   const [live, setLive] = useState<Live | null>(null);
   const [summary, setSummary] = useState<SessionRecord | null>(null);
+  /** Trwająca przerwa; null = ekran wyboru długości. */
+  const [brk, setBrk] = useState<Brk | null>(null);
 
   const liveRef = useRef<Live | null>(null);
   liveRef.current = live;
@@ -136,6 +146,30 @@ export default function App() {
     return () => window.clearInterval(id);
   }, [ticking]);
 
+  // ---------- zegar przerwy ----------
+  const breakTicking = phase === "break" && !!brk && !brk.finished;
+
+  useEffect(() => {
+    if (!breakTicking) return;
+    let last = Date.now();
+    const id = window.setInterval(() => {
+      const now = Date.now();
+      const delta = (now - last) / 1000;
+      last = now;
+      setBrk((b) => (b ? { ...b, leftSec: b.leftSec - delta } : b));
+    }, 250);
+    return () => window.clearInterval(id);
+  }, [breakTicking]);
+
+  useEffect(() => {
+    if (!breakTicking || !brk || brk.leftSec > 0) return;
+    if (soundRef.current) playChime();
+    if (notifyRef.current && !document.hasFocus()) {
+      void notify("◈ Koniec przerwy", "Czas na kolejną sesję skupienia.", "break-end");
+    }
+    setBrk((b) => (b ? { ...b, leftSec: 0, finished: true } : b));
+  }, [breakTicking, brk]);
+
   // ---------- zapis aktywnej sesji (przetrwa odświeżenie) ----------
   useEffect(() => {
     if (phase !== "session") return;
@@ -167,10 +201,12 @@ export default function App() {
   useEffect(() => {
     if (phase === "session" && live) {
       document.title = `${fmt(live.remainingSec)} · Focus Doubler`;
+    } else if (phase === "break" && brk && !brk.finished) {
+      document.title = `${fmt(brk.leftSec)} · Przerwa`;
     } else {
       document.title = "Focus Doubler";
     }
-  }, [phase, live?.remainingSec, live]);
+  }, [phase, live?.remainingSec, live, brk]);
 
   const endSession = useCallback((completed: boolean) => {
     const s = liveRef.current;
@@ -251,6 +287,21 @@ export default function App() {
       s ? { ...s, checkinOpen: true, finalCheckin: timeUp } : s,
     );
   }, [ticking, live, endSession]);
+
+  /** Start przerwy o zadanej długości. */
+  function startBreak(min: number) {
+    const sec = min * SECONDS_PER_MIN;
+    setBrk({ totalSec: sec, leftSec: sec, finished: false });
+  }
+
+  /** Koniec przerwy — z powrotem do ekranu nowej sesji. */
+  function leaveBreak() {
+    void closeNotifications("break-end");
+    setBrk(null);
+    setSummary(null);
+    setTask("");
+    setPhase("setup");
+  }
 
   function startSession() {
     const finalTask = task.trim() || "Sesja skupienia";
@@ -355,7 +406,15 @@ export default function App() {
     return fresh.length;
   }
 
-  const dotPulsing = phase === "session" && !!live && !live.paused;
+  const dotPulsing =
+    (phase === "session" && !!live && !live.paused) ||
+    (phase === "break" && !!brk && !brk.finished);
+
+  const breakView: BreakView = !brk
+    ? { kind: "pick" }
+    : brk.finished
+      ? { kind: "done" }
+      : { kind: "run", leftSec: brk.leftSec, totalSec: brk.totalSec };
 
   return (
     <div className="app">
@@ -424,11 +483,18 @@ export default function App() {
       {phase === "summary" && summary && (
         <SummaryScreen
           record={summary}
-          onNewSession={() => {
-            setTask("");
-            setSummary(null);
-            setPhase("setup");
+          onBreak={() => {
+            setBrk(null);
+            setPhase("break");
           }}
+        />
+      )}
+
+      {phase === "break" && (
+        <BreakScreen
+          view={breakView}
+          onPick={startBreak}
+          onSkip={leaveBreak}
         />
       )}
 
