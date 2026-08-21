@@ -5,11 +5,14 @@ import type { CheckinEntry, Rating } from "@/lib/types";
 import { nowHM } from "@/lib/time";
 
 export default function CheckinModal({
+  final = false,
   onSave,
-  onSkip,
+  onAbort,
 }: {
+  /** Ostatni check-in sesji — po zapisie od razu podsumowanie. */
+  final?: boolean;
   onSave: (entry: CheckinEntry) => void;
-  onSkip: () => void;
+  onAbort: () => void;
 }) {
   const [done, setDone] = useState("");
   const [working, setWorking] = useState("");
@@ -22,6 +25,7 @@ export default function CheckinModal({
   }, []);
 
   function save() {
+    if (!rating) return;
     onSave({
       type: "checkin",
       time: nowHM(),
@@ -35,13 +39,15 @@ export default function CheckinModal({
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-label="Check-in">
       <div className="panel modal">
-        <p className="modal-title">◈ Check-in</p>
+        <p className="modal-title">◈ Check-in{final ? " — ostatni" : ""}</p>
         <p className="modal-sub">
-          Timer wstrzymany. Krótki status i wracasz do pracy.
+          {final
+            ? "Czas sesji minął. Oceń ostatni odcinek i zamknij sesję."
+            : "Timer wstrzymany. Krótki status i wracasz do pracy."}
         </p>
 
         <label className="field-label" htmlFor="doneInput">
-          Co udało się zrobić?
+          Co udało się zrobić? (opcjonalnie)
         </label>
         <textarea
           id="doneInput"
@@ -54,7 +60,7 @@ export default function CheckinModal({
 
         <div className="field-inline">
           <label className="field-label" htmlFor="workingInput">
-            Nad czym pracujesz teraz?
+            Nad czym pracujesz teraz? (opcjonalnie)
           </label>
           <textarea
             id="workingInput"
@@ -95,13 +101,25 @@ export default function CheckinModal({
           </button>
         </div>
 
+        {/* zawsze w drzewie — inaczej przyciski przeskakują po wyborze oceny */}
+        <p className={`rate-required${rating ? " done" : ""}`}>
+          Ocena jest wymagana — reszta pól jest opcjonalna.
+        </p>
+
         <div className="modal-actions">
-          <button className="btn btn-primary" onClick={save}>
-            Zapisz i wróć do pracy
+          <button
+            className="btn btn-primary"
+            onClick={save}
+            disabled={!rating}
+            title={rating ? undefined : "Najpierw oceń swoje skupienie"}
+          >
+            {final ? "Zapisz i zakończ sesję" : "Zapisz i wróć do pracy"}
           </button>
-          <button className="btn btn-ghost" onClick={onSkip}>
-            Pomiń
-          </button>
+          {!final && (
+            <button className="btn btn-ghost" onClick={onAbort}>
+              Zakończ sesję
+            </button>
+          )}
         </div>
       </div>
     </div>

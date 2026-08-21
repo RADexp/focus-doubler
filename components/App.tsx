@@ -8,6 +8,7 @@ import type {
   SessionRecord,
 } from "@/lib/types";
 import { SECONDS_PER_MIN, fmt, nowHM, todayKey } from "@/lib/time";
+import { APP_VERSION } from "@/lib/version";
 import { playChime } from "@/lib/chime";
 import {
   closeNotifications,
@@ -47,8 +48,17 @@ interface Live {
   checkinRemainingSec: number;
   paused: boolean;
   checkinOpen: boolean;
+  /** Ten check-in jest ostatni — po zapisaniu oceny sesja się kończy. */
+  finalCheckin: boolean;
   resumed: boolean;
 }
+
+/**
+ * Jaką część interwału musi mieć nieoceniona końcówka sesji, żeby wymusić
+ * ostatni check-in. Chroni tylko przed pytaniem o ocenę kilku sekund pracy —
+ * przy check-inie co 10 min to próg 30 s.
+ */
+const MIN_FINAL_CHECKIN_RATIO = 0.05;
 
 export default function App() {
   const [phase, setPhase] = useState<Phase>("setup");
@@ -81,7 +91,7 @@ export default function App() {
     registerServiceWorker();
 
     const active = loadActive();
-    if (active && active.remainingSec > 0) {
+    if (active) {
       setLive({
         task: active.task,
         lengthMin: active.lengthMin,
@@ -92,6 +102,7 @@ export default function App() {
         checkinRemainingSec: active.checkinRemainingSec,
         paused: true,
         checkinOpen: false,
+        finalCheckin: false,
         resumed: true,
       });
       setTask(active.task);
@@ -213,17 +224,32 @@ export default function App() {
   // ---------- reakcja na wyzerowanie liczników ----------
   useEffect(() => {
     if (!ticking || !live) return;
-    if (live.remainingSec <= 0) {
-      endSession(true);
-      return;
-    }
-    if (live.checkinRemainingSec <= 0) {
-      if (soundRef.current) playChime();
-      if (notifyRef.current && !document.hasFocus()) {
-        void notify("◈ Check-in", `Krótki status: ${live.task}`, "checkin");
+    const timeUp = live.remainingSec <= 0;
+    const checkinDue = live.checkinRemainingSec <= 0;
+    if (!timeUp && !checkinDue) return;
+
+    // Koniec sesji nigdy nie wyprzedza check-inu: najpierw ocena odcinka,
+    // dopiero po niej podsumowanie. Pomijamy tylko końcówki krótsze niż próg.
+    if (timeUp) {
+      const intervalSec = live.freqMin * SECONDS_PER_MIN;
+      const unratedSec = intervalSec - Math.max(0, live.checkinRemainingSec);
+      if (unratedSec < intervalSec * MIN_FINAL_CHECKIN_RATIO) {
+        endSession(true);
+        return;
       }
-      setLive((s) => (s ? { ...s, checkinOpen: true } : s));
     }
+
+    if (soundRef.current) playChime();
+    if (notifyRef.current && !document.hasFocus()) {
+      void notify(
+        timeUp ? "◈ Ostatni check-in" : "◈ Check-in",
+        `Krótki status: ${live.task}`,
+        "checkin",
+      );
+    }
+    setLive((s) =>
+      s ? { ...s, checkinOpen: true, finalCheckin: timeUp } : s,
+    );
   }, [ticking, live, endSession]);
 
   function startSession() {
@@ -245,17 +271,18 @@ export default function App() {
       checkinRemainingSec: freqMin * SECONDS_PER_MIN,
       paused: false,
       checkinOpen: false,
+      finalCheckin: false,
       resumed: false,
     });
     setPhase("session");
   }
 
-  function closeCheckinAndResume(entry?: CheckinEntry) {
+  function saveCheckin(entry: CheckinEntry) {
     const s = liveRef.current;
     if (!s) return;
     void closeNotifications("checkin");
-    const entries = entry ? [...s.entries, entry] : s.entries;
-    if (s.remainingSec <= 0) {
+    const entries = [...s.entries, entry];
+    if (s.finalCheckin || s.remainingSec <= 0) {
       liveRef.current = { ...s, entries, checkinOpen: false };
       setLive(liveRef.current);
       endSession(true);
@@ -267,6 +294,12 @@ export default function App() {
       checkinOpen: false,
       checkinRemainingSec: s.freqMin * SECONDS_PER_MIN,
     });
+  }
+
+  /** Wyjście awaryjne z check-inu: nie wraca do pracy, tylko kończy sesję. */
+  function abortFromCheckin() {
+    void closeNotifications("checkin");
+    endSession(liveRef.current?.finalCheckin ?? false);
   }
 
   function flashHint(msg: string) {
@@ -401,10 +434,13 @@ export default function App() {
 
       {phase === "session" && live?.checkinOpen && (
         <CheckinModal
-          onSave={(entry) => closeCheckinAndResume(entry)}
-          onSkip={() => closeCheckinAndResume()}
+          final={live.finalCheckin}
+          onSave={saveCheckin}
+          onAbort={abortFromCheckin}
         />
       )}
+
+      <footer className="app-version">Focus Doubler v{APP_VERSION}</footer>
     </div>
   );
 }
