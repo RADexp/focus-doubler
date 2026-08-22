@@ -2,15 +2,16 @@
 
 import { useEffect, useState } from "react";
 import type { Entry } from "@/lib/types";
-import { fmt } from "@/lib/time";
 import EntryList from "./EntryList";
-import Ring from "./Ring";
+import SessionTimer from "./SessionTimer";
 
 export default function SessionScreen({
   task,
   totalSec,
   remainingSec,
   checkinRemainingSec,
+  freqMin,
+  startedAt,
   paused,
   entries,
   resumed,
@@ -21,6 +22,8 @@ export default function SessionScreen({
   totalSec: number;
   remainingSec: number;
   checkinRemainingSec: number;
+  freqMin: number;
+  startedAt: string;
   paused: boolean;
   entries: Entry[];
   resumed: boolean;
@@ -43,12 +46,15 @@ export default function SessionScreen({
             Wznowiono przerwaną sesję — timer stoi na pauzie.
           </div>
         )}
-        <div className="ring-wrap">
-          <Ring remainingSec={remainingSec} totalSec={totalSec} task={task} />
-          <div className="checkin-counter">
-            ◈ Następny check-in za <b>{fmt(Math.max(0, checkinRemainingSec))}</b>
-          </div>
-        </div>
+        <SessionTimer
+          task={task}
+          totalSec={totalSec}
+          remainingSec={remainingSec}
+          checkinRemainingSec={checkinRemainingSec}
+          freqMin={freqMin}
+          startedAt={startedAt}
+          entries={entries}
+        />
         <div className="session-controls">
           <button className="btn btn-ghost" onClick={onTogglePause}>
             {paused ? "▶ Wznów" : "⏸ Pauza"}

@@ -8,7 +8,10 @@ export function fmt(sec: number): string {
 }
 
 export function nowHM(): string {
-  const d = new Date();
+  return hm(new Date());
+}
+
+export function hm(d: Date): string {
   return pad(d.getHours()) + ":" + pad(d.getMinutes());
 }
 

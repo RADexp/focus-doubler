@@ -468,6 +468,8 @@ export default function App() {
           totalSec={live.lengthMin * SECONDS_PER_MIN}
           remainingSec={live.remainingSec}
           checkinRemainingSec={live.checkinRemainingSec}
+          freqMin={live.freqMin}
+          startedAt={live.startedAt}
           paused={live.paused}
           entries={live.entries}
           resumed={live.resumed && live.paused}
