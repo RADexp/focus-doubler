@@ -3,9 +3,12 @@ import EntryList from "./EntryList";
 
 export default function SummaryScreen({
   record,
+  blockExpired,
   onBreak,
 }: {
   record: SessionRecord;
+  /** Czas bloku wyczerpał się w trakcie tej sesji — dalej idzie się do podsumowania bloku. */
+  blockExpired: boolean;
   /** Dalej: ekran przerwy (stamtąd start kolejnej sesji). */
   onBreak: () => void;
 }) {
@@ -34,7 +37,7 @@ export default function SummaryScreen({
         </div>
         <div style={{ marginTop: 18 }}>
           <button className="btn btn-primary" onClick={onBreak}>
-            ◈ Przejdź do przerwy
+            {blockExpired ? "◈ Zamknij blok" : "◈ Przejdź do przerwy"}
           </button>
         </div>
       </div>

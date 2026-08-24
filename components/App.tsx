@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   ActiveSession,
+  BlockRecord,
   CheckinEntry,
   Entry,
   SessionRecord,
 } from "@/lib/types";
-import { SECONDS_PER_MIN, fmt, nowHM, todayKey } from "@/lib/time";
+import { SECONDS_PER_MIN, fmt, hmSpan, nowHM, todayKey } from "@/lib/time";
 import { APP_VERSION } from "@/lib/version";
 import { playChime } from "@/lib/chime";
 import {
@@ -19,17 +20,29 @@ import {
   requestNotifyPermission,
 } from "@/lib/notify";
 import {
+  appendBlock,
   appendSession,
   clearActive,
+  clearActiveBlock,
   loadActive,
+  loadActiveBlock,
+  loadBlockEnabled,
+  loadBlockMin,
+  loadBlocks,
   loadSessions,
   loadSoundEnabled,
   saveActive,
+  saveActiveBlock,
+  saveBlockEnabled,
+  saveBlockMin,
+  saveBlocks,
   loadNotifyEnabled,
   saveNotifyEnabled,
   saveSessions,
   saveSoundEnabled,
 } from "@/lib/storage";
+import BlockEndScreen from "./BlockEndScreen";
+import BlockRail from "./BlockRail";
 import BreakScreen, { type BreakView } from "./BreakScreen";
 import CheckinModal from "./CheckinModal";
 import History from "./History";
@@ -37,7 +50,7 @@ import SessionScreen from "./SessionScreen";
 import SetupScreen from "./SetupScreen";
 import SummaryScreen from "./SummaryScreen";
 
-type Phase = "setup" | "session" | "summary" | "break";
+type Phase = "setup" | "session" | "summary" | "break" | "blockEnd";
 
 interface Live {
   task: string;
@@ -61,6 +74,23 @@ interface Live {
  */
 const MIN_FINAL_CHECKIN_RATIO = 0.05;
 
+/** Blok deep work w trakcie — rama, w której odpalamy kolejne sesje. */
+interface LiveBlock {
+  id: number;
+  date: string;
+  plannedMin: number;
+  startedAt: string;
+  remainingSec: number;
+  /** Czas bloku wyczerpany; trwająca sesja ma prawo dobiec do końca. */
+  expired: boolean;
+  overtimeSec: number;
+  sessionIds: number[];
+  marks: number[];
+}
+
+/** Domyślna długość bloku przy pierwszym uruchomieniu. */
+const DEFAULT_BLOCK_MIN = 120;
+
 interface Brk {
   totalSec: number;
   leftSec: number;
@@ -82,11 +112,21 @@ export default function App() {
 
   const [live, setLive] = useState<Live | null>(null);
   const [summary, setSummary] = useState<SessionRecord | null>(null);
+  const [blocks, setBlocks] = useState<BlockRecord[]>([]);
+  const [block, setBlock] = useState<LiveBlock | null>(null);
+  const [blockEnabled, setBlockEnabledState] = useState(false);
+  const [blockMin, setBlockMinState] = useState(DEFAULT_BLOCK_MIN);
+  /** Zamknięty przed chwilą blok — do ekranu podsumowania. */
+  const [blockSummary, setBlockSummary] = useState<BlockRecord | null>(null);
   /** Trwająca przerwa; null = ekran wyboru długości. */
   const [brk, setBrk] = useState<Brk | null>(null);
 
   const liveRef = useRef<Live | null>(null);
   liveRef.current = live;
+  const blockRef = useRef<LiveBlock | null>(null);
+  blockRef.current = block;
+  /** Dzwonek o końcu bloku ma zabrzmieć raz. */
+  const blockAlerted = useRef(false);
   const soundRef = useRef(soundEnabled);
   soundRef.current = soundEnabled;
   const notifyRef = useRef(notifyEnabled);
@@ -95,10 +135,29 @@ export default function App() {
   // ---------- start: wczytaj dane z localStorage ----------
   useEffect(() => {
     setSessions(loadSessions());
+    setBlocks(loadBlocks());
+    setBlockEnabledState(loadBlockEnabled());
+    setBlockMinState(loadBlockMin(DEFAULT_BLOCK_MIN));
     setSoundEnabled(loadSoundEnabled());
     setNotifyEnabled(loadNotifyEnabled() && notifyPermission() === "granted");
     setLoaded(true);
     registerServiceWorker();
+
+    const activeBlock = loadActiveBlock();
+    if (activeBlock) {
+      setBlock({
+        id: activeBlock.id,
+        date: activeBlock.date,
+        plannedMin: activeBlock.plannedMin,
+        startedAt: activeBlock.startedAt,
+        remainingSec: activeBlock.remainingSec,
+        expired: activeBlock.expired,
+        overtimeSec: activeBlock.overtimeSec || 0,
+        sessionIds: activeBlock.sessionIds || [],
+        marks: activeBlock.marks || [],
+      });
+      blockAlerted.current = activeBlock.expired;
+    }
 
     const active = loadActive();
     if (active) {
@@ -145,6 +204,49 @@ export default function App() {
     }, 250);
     return () => window.clearInterval(id);
   }, [ticking]);
+
+  // ---------- zegar bloku ----------
+  // Blok liczy się także w przerwie i między sesjami (przerwa jest jego częścią),
+  // ale stoi razem z sesją: pauza i otwarty check-in zatrzymują oba zegary.
+  const blockTicking =
+    !!block &&
+    phase !== "blockEnd" &&
+    !(phase === "session" && !!live && (live.paused || live.checkinOpen));
+
+  useEffect(() => {
+    if (!blockTicking) return;
+    let last = Date.now();
+    const id = window.setInterval(() => {
+      const now = Date.now();
+      const delta = (now - last) / 1000;
+      last = now;
+      setBlock((b) => {
+        if (!b) return b;
+        if (b.remainingSec > 0) {
+          const rem = b.remainingSec - delta;
+          return rem > 0
+            ? { ...b, remainingSec: rem }
+            : { ...b, remainingSec: 0, expired: true, overtimeSec: -rem };
+        }
+        return { ...b, overtimeSec: b.overtimeSec + delta };
+      });
+    }, 250);
+    return () => window.clearInterval(id);
+  }, [blockTicking]);
+
+  // ---------- koniec czasu bloku ----------
+  useEffect(() => {
+    if (!block?.expired || blockAlerted.current) return;
+    blockAlerted.current = true;
+    if (soundRef.current) playChime();
+    if (notifyRef.current && !document.hasFocus()) {
+      void notify(
+        "◈ Koniec bloku deep work",
+        "Trwająca sesja dobiegnie końca, potem podsumowanie.",
+        "block-end",
+      );
+    }
+  }, [block?.expired]);
 
   // ---------- zegar przerwy ----------
   const breakTicking = phase === "break" && !!brk && !brk.finished;
@@ -197,6 +299,24 @@ export default function App() {
     };
   }, [phase, live?.entries]);
 
+  // ---------- zapis aktywnego bloku ----------
+  useEffect(() => {
+    if (!block) return;
+    const persist = () => {
+      const b = blockRef.current;
+      if (!b) return;
+      saveActiveBlock({ ...b, savedAt: Date.now() });
+    };
+    persist();
+    const id = window.setInterval(persist, 5000);
+    window.addEventListener("beforeunload", persist);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener("beforeunload", persist);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [block?.id]);
+
   // ---------- tytuł karty ----------
   useEffect(() => {
     if (phase === "session" && live) {
@@ -228,10 +348,12 @@ export default function App() {
       },
     ];
 
+    const b = blockRef.current;
     const record: SessionRecord = {
       id: Date.now(),
       date: todayKey(),
       startedAt: s.startedAt,
+      endedAt: new Date().toISOString(),
       task: s.task,
       lengthMin: s.lengthMin,
       checkinFreqMin: s.freqMin,
@@ -239,7 +361,20 @@ export default function App() {
       up,
       down,
       completed,
+      blockId: b?.id,
     };
+
+    if (b) {
+      const elapsedSec =
+        b.plannedMin * SECONDS_PER_MIN - b.remainingSec + b.overtimeSec;
+      const next: LiveBlock = {
+        ...b,
+        sessionIds: [...b.sessionIds, record.id],
+        marks: [...b.marks, elapsedSec],
+      };
+      blockRef.current = next;
+      setBlock(next);
+    }
 
     if (completed && notifyRef.current && !document.hasFocus()) {
       void notify(
@@ -256,6 +391,45 @@ export default function App() {
     setLive(null);
     setPhase("summary");
   }, []);
+
+  /** Domknięcie bloku: zapis rekordu i przejście na ekran podsumowania. */
+  const closeBlock = useCallback(() => {
+    const b = blockRef.current;
+    if (!b) return;
+    const ended = new Date();
+    // Liczymy zegarem bloku, nie ściennym — pauzy nie mają udawać dogrywki.
+    const actualMin = Math.round(
+      (b.plannedMin * SECONDS_PER_MIN -
+        Math.max(0, b.remainingSec) +
+        b.overtimeSec) /
+        SECONDS_PER_MIN,
+    );
+    const record: BlockRecord = {
+      id: b.id,
+      date: b.date,
+      startedAt: b.startedAt,
+      endedAt: ended.toISOString(),
+      plannedMin: b.plannedMin,
+      actualMin,
+      sessionIds: b.sessionIds,
+    };
+    void closeNotifications("block-end");
+    setBlocks(appendBlock(record));
+    clearActiveBlock();
+    blockRef.current = null;
+    setBlock(null);
+    setBrk(null);
+    setSummary(null);
+    setBlockSummary(record);
+    setPhase("blockEnd");
+  }, []);
+
+  // Blok czeka tylko na trwającą sesję — poza nią domyka się sam.
+  useEffect(() => {
+    if (!block?.expired) return;
+    if (phase !== "setup" && phase !== "break") return;
+    closeBlock();
+  }, [block?.expired, phase, closeBlock]);
 
   // ---------- reakcja na wyzerowanie liczników ----------
   useEffect(() => {
@@ -288,6 +462,16 @@ export default function App() {
     );
   }, [ticking, live, endSession]);
 
+  function setBlockEnabled(v: boolean) {
+    setBlockEnabledState(v);
+    saveBlockEnabled(v);
+  }
+
+  function setBlockMin(v: number) {
+    setBlockMinState(v);
+    saveBlockMin(v);
+  }
+
   /** Start przerwy o zadanej długości. */
   function startBreak(min: number) {
     const sec = min * SECONDS_PER_MIN;
@@ -306,6 +490,28 @@ export default function App() {
   function startSession() {
     const finalTask = task.trim() || "Sesja skupienia";
     const totalSec = lengthMin * SECONDS_PER_MIN;
+
+    // Pierwsza sesja otwiera blok; kolejne wchodzą do już otwartego.
+    let inBlock = blockRef.current;
+    if (!inBlock && blockEnabled) {
+      const started = new Date();
+      const fresh: LiveBlock = {
+        id: started.getTime(),
+        date: todayKey(),
+        plannedMin: blockMin,
+        startedAt: started.toISOString(),
+        remainingSec: blockMin * SECONDS_PER_MIN,
+        expired: false,
+        overtimeSec: 0,
+        sessionIds: [],
+        marks: [],
+      };
+      blockAlerted.current = false;
+      blockRef.current = fresh;
+      setBlock(fresh);
+      inBlock = fresh;
+    }
+
     setLive({
       task: finalTask,
       lengthMin,
@@ -315,7 +521,9 @@ export default function App() {
         {
           type: "system",
           time: nowHM(),
-          note: `Sesja rozpoczęta: „${finalTask}” · ${lengthMin} min · check-in co ${freqMin} min`,
+          note: inBlock
+            ? `Sesja rozpoczęta: „${finalTask}” · ${lengthMin} min · check-in co ${freqMin} min · blok ${hmSpan(inBlock.plannedMin)}`
+            : `Sesja rozpoczęta: „${finalTask}” · ${lengthMin} min · check-in co ${freqMin} min`,
         },
       ],
       remainingSec: totalSec,
@@ -393,10 +601,24 @@ export default function App() {
     );
   }
 
-  function handleImport(imported: SessionRecord[]): number {
+  function handleImport(
+    importedSessions: SessionRecord[],
+    importedBlocks: BlockRecord[],
+  ): number {
+    const existingBlocks = loadBlocks();
+    const seenBlocks = new Set(existingBlocks.map((b) => b.id));
+    const freshBlocks = importedBlocks.filter(
+      (b) => b && typeof b === "object" && b.id && !seenBlocks.has(b.id),
+    );
+    if (freshBlocks.length) {
+      const mergedBlocks = [...existingBlocks, ...freshBlocks];
+      saveBlocks(mergedBlocks);
+      setBlocks(mergedBlocks);
+    }
+
     const existing = loadSessions();
     const seen = new Set(existing.map((s) => s.id));
-    const fresh = imported.filter(
+    const fresh = importedSessions.filter(
       (s) => s && typeof s === "object" && s.id && !seen.has(s.id),
     );
     if (!fresh.length) return 0;
@@ -443,6 +665,21 @@ export default function App() {
 
       {hint && <div className="hint">{hint}</div>}
 
+      {block && phase !== "blockEnd" && (
+        <BlockRail
+          plannedMin={block.plannedMin}
+          remainingSec={block.remainingSec}
+          expired={block.expired}
+          overtimeSec={block.overtimeSec}
+          marks={block.marks}
+          sessionCount={block.sessionIds.length}
+          paused={phase === "session" && !!live && live.paused}
+          startedAt={block.startedAt}
+          canClose={phase === "setup" || phase === "break"}
+          onClose={closeBlock}
+        />
+      )}
+
       {phase === "setup" && (
         <>
           <SetupScreen
@@ -452,10 +689,16 @@ export default function App() {
             setLengthMin={setLengthMin}
             freqMin={freqMin}
             setFreqMin={setFreqMin}
+            blockActive={!!block}
+            blockEnabled={blockEnabled}
+            setBlockEnabled={setBlockEnabled}
+            blockMin={blockMin}
+            setBlockMin={setBlockMin}
             onStart={startSession}
           />
           <History
             sessions={sessions}
+            blocks={blocks}
             loaded={loaded}
             onImport={handleImport}
           />
@@ -485,7 +728,12 @@ export default function App() {
       {phase === "summary" && summary && (
         <SummaryScreen
           record={summary}
+          blockExpired={!!block?.expired}
           onBreak={() => {
+            if (block?.expired) {
+              closeBlock();
+              return;
+            }
             setBrk(null);
             setPhase("break");
           }}
@@ -495,8 +743,30 @@ export default function App() {
       {phase === "break" && (
         <BreakScreen
           view={breakView}
+          blockLeftSec={block ? block.remainingSec : null}
+          lengthMin={lengthMin}
           onPick={startBreak}
           onSkip={leaveBreak}
+        />
+      )}
+
+      {phase === "blockEnd" && blockSummary && (
+        <BlockEndScreen
+          record={blockSummary}
+          sessions={sessions.filter((s) => s.blockId === blockSummary.id)}
+          onNewBlock={() => {
+            setBlockSummary(null);
+            setBlockMin(blockSummary.plannedMin);
+            setBlockEnabled(true);
+            setTask("");
+            setPhase("setup");
+          }}
+          onDone={() => {
+            setBlockSummary(null);
+            setBlockEnabled(false);
+            setTask("");
+            setPhase("setup");
+          }}
         />
       )}
 

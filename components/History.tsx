@@ -1,9 +1,41 @@
 "use client";
 
 import { useRef, useState } from "react";
-import type { SessionRecord } from "@/lib/types";
-import { dateLabel } from "@/lib/time";
+import type { BlockRecord, SessionRecord } from "@/lib/types";
+import { dateLabel, hm, hmSpan } from "@/lib/time";
 import EntryList from "./EntryList";
+
+/**
+ * Wiersz historii: albo blok deep work z sesjami w środku, albo pojedyncza
+ * sesja odbyta poza blokiem.
+ */
+type Row =
+  | { kind: "block"; block: BlockRecord; sessions: SessionRecord[] }
+  | { kind: "session"; session: SessionRecord };
+
+/** Sesje w kolejności od najnowszej, z podpięciem pod bloki tego samego dnia. */
+function toRows(group: SessionRecord[], blocks: BlockRecord[]): Row[] {
+  const byId = new Map(blocks.map((b) => [b.id, b]));
+  const rows: Row[] = [];
+  const opened = new Map<number, Row & { kind: "block" }>();
+
+  for (const s of group) {
+    const block = s.blockId ? byId.get(s.blockId) : undefined;
+    if (!block) {
+      rows.push({ kind: "session", session: s });
+      continue;
+    }
+    const existing = opened.get(block.id);
+    if (existing) {
+      existing.sessions.push(s);
+      continue;
+    }
+    const row = { kind: "block" as const, block, sessions: [s] };
+    opened.set(block.id, row);
+    rows.push(row);
+  }
+  return rows;
+}
 
 function groupByDate(sessions: SessionRecord[]) {
   const byDate: Record<string, SessionRecord[]> = {};
@@ -27,14 +59,38 @@ function groupByDate(sessions: SessionRecord[]) {
     });
 }
 
+function SessionItem({ session }: { session: SessionRecord }) {
+  return (
+    <details className="session-item">
+      <summary>
+        <span className="sess-task">{session.task || "Bez tytułu"}</span>
+        <span className="sess-meta">
+          {session.lengthMin} min · 👍{session.up || 0} 👎{session.down || 0}
+        </span>
+      </summary>
+      <div className="sess-entries">
+        <EntryList
+          entries={session.entries || []}
+          emptyText="Brak zapisanych check-inów w tej sesji."
+        />
+      </div>
+    </details>
+  );
+}
+
 export default function History({
   sessions,
+  blocks,
   loaded,
   onImport,
 }: {
   sessions: SessionRecord[];
+  blocks: BlockRecord[];
   loaded: boolean;
-  onImport: (imported: SessionRecord[]) => number;
+  onImport: (
+    importedSessions: SessionRecord[],
+    importedBlocks: BlockRecord[],
+  ) => number;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [note, setNote] = useState("");
@@ -45,7 +101,8 @@ export default function History({
   }
 
   function handleExport() {
-    const blob = new Blob([JSON.stringify(sessions, null, 2)], {
+    const payload = { version: 2, sessions, blocks };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
       type: "application/json",
     });
     const url = URL.createObjectURL(blob);
@@ -59,11 +116,24 @@ export default function History({
   async function handleFile(file: File) {
     try {
       const parsed: unknown = JSON.parse(await file.text());
-      if (!Array.isArray(parsed)) {
+      // Pliki sprzed wersji 0.5 to goła lista sesji, nowsze mają też bloki.
+      const shape =
+        Array.isArray(parsed)
+          ? { sessions: parsed as SessionRecord[], blocks: [] as BlockRecord[] }
+          : parsed && typeof parsed === "object" &&
+              Array.isArray((parsed as { sessions?: unknown }).sessions)
+            ? {
+                sessions: (parsed as { sessions: SessionRecord[] }).sessions,
+                blocks: Array.isArray((parsed as { blocks?: unknown }).blocks)
+                  ? (parsed as { blocks: BlockRecord[] }).blocks
+                  : [],
+              }
+            : null;
+      if (!shape) {
         flash("Nieprawidłowy plik — oczekiwano listy sesji.");
         return;
       }
-      const added = onImport(parsed as SessionRecord[]);
+      const added = onImport(shape.sessions, shape.blocks);
       flash(added ? `Zaimportowano ${added} sesji.` : "Brak nowych sesji.");
     } catch {
       flash("Nie udało się odczytać pliku.");
@@ -123,22 +193,29 @@ export default function History({
                 &nbsp; <span className="down">👎 {down}</span>
               </span>
             </div>
-            {group.map((s) => (
-              <details className="session-item" key={s.id}>
-                <summary>
-                  <span className="sess-task">{s.task || "Bez tytułu"}</span>
-                  <span className="sess-meta">
-                    {s.lengthMin} min · 👍{s.up || 0} 👎{s.down || 0}
-                  </span>
-                </summary>
-                <div className="sess-entries">
-                  <EntryList
-                    entries={s.entries || []}
-                    emptyText="Brak zapisanych check-inów w tej sesji."
-                  />
+            {toRows(group, blocks).map((row) =>
+              row.kind === "session" ? (
+                <SessionItem key={row.session.id} session={row.session} />
+              ) : (
+                <div className="hist-block" key={row.block.id}>
+                  <div className="hist-block-head">
+                    <span>Blok {hmSpan(row.block.plannedMin)}</span>
+                    <span className="hist-block-meta">
+                      {hm(new Date(row.block.startedAt))} →{" "}
+                      {hm(new Date(row.block.endedAt))} · {row.sessions.length}{" "}
+                      {row.sessions.length === 1
+                        ? "sesja"
+                        : row.sessions.length < 5
+                          ? "sesje"
+                          : "sesji"}
+                    </span>
+                  </div>
+                  {row.sessions.map((s) => (
+                    <SessionItem key={s.id} session={s} />
+                  ))}
                 </div>
-              </details>
-            ))}
+              ),
+            )}
           </div>
         ))
       )}

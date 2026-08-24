@@ -48,3 +48,15 @@ export function truncate(str: string, n: number): string {
 
 /** Ile sekund liczymy jako "minutę" — podmieniane tylko przy testach. */
 export const SECONDS_PER_MIN = 60;
+
+/** Odliczanie w skali bloku: „1:32" (godziny:minuty, minuty w górę). */
+export function hmLeft(sec: number): string {
+  const total = Math.max(0, Math.ceil(sec / 60));
+  return Math.floor(total / 60) + ":" + pad(total % 60);
+}
+
+/** Długość podana w minutach jako „2:30". */
+export function hmSpan(min: number): string {
+  const total = Math.max(0, Math.round(min));
+  return Math.floor(total / 60) + ":" + pad(total % 60);
+}
