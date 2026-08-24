@@ -1,6 +1,6 @@
 "use client";
 
-import { fmt } from "@/lib/time";
+import { fmt, hmLeft } from "@/lib/time";
 
 /** Długości przerwy do wyboru — minuty wraz z podpowiedzią, co się w nich mieści. */
 const OPTIONS: { min: number; hint: string }[] = [
@@ -18,10 +18,16 @@ export type BreakView =
 
 export default function BreakScreen({
   view,
+  blockLeftSec,
+  lengthMin,
   onPick,
   onSkip,
 }: {
   view: BreakView;
+  /** Ile zostało bloku deep work; null, gdy pracujemy bez bloku. */
+  blockLeftSec: number | null;
+  /** Długość sesji, którą mierzymy, czy jeszcze się zmieści. */
+  lengthMin: number;
   /** Start przerwy o zadanej długości. */
   onPick: (min: number) => void;
   /** Koniec przerwy — przejście do nowej sesji skupienia. */
@@ -79,6 +85,8 @@ export default function BreakScreen({
     );
   }
 
+  const inBlock = blockLeftSec !== null && blockLeftSec > 0;
+
   return (
     <div className="br-screen">
       <div className="br-eyebrow">
@@ -88,7 +96,11 @@ export default function BreakScreen({
       <div className="br-body">
         <h1 className="br-h">Odetchnij.</h1>
         <p className="br-sub">
-          Jedno dotknięcie startuje przerwę. Bez potwierdzania.
+          {!inBlock
+            ? "Jedno dotknięcie startuje przerwę. Bez potwierdzania."
+            : blockLeftSec >= lengthMin * 60
+              ? `Zostało ${hmLeft(blockLeftSec)} bloku — przerwa liczy się do niego, ale na pełną sesję ${lengthMin} min jeszcze starczy.`
+              : `Zostało ${hmLeft(blockLeftSec)} bloku — na pełną sesję ${lengthMin} min już nie starczy.`}
         </p>
 
         {OPTIONS.map((o, i) => (
@@ -101,7 +113,11 @@ export default function BreakScreen({
             <span className="br-opt-top">
               <span className="br-opt-num">{o.min}</span>
               <span className="br-opt-unit">min</span>
-              <span className="br-opt-desc">{o.hint}</span>
+              <span className="br-opt-desc">
+                {inBlock
+                  ? `${o.hint} · zostanie ${hmLeft(blockLeftSec - o.min * 60)}`
+                  : o.hint}
+              </span>
             </span>
             <span className="br-opt-bar">
               <i style={{ width: `${(o.min / MAX_MIN) * 100}%` }} />
