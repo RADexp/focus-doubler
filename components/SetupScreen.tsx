@@ -57,7 +57,7 @@ export default function SetupScreen({
                 <path d="M12 5v14M5 12h14" />
               </svg>
             </span>
-            Dodaj blok deep work
+            Dodaj blok <b>DEEP WORK</b>
           </button>
         )}
 
