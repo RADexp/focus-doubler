@@ -1,2 +1,2 @@
-/** Wersja aplikacji — pokazywana w stopce. Podbijaj przy każdej zmianie. */
-export const APP_VERSION = "0.5.1";
+/** Wersja aplikacji — pokazywana w stopce. Podbijaj w package.json. */
+export const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "dev";
