@@ -6,11 +6,14 @@ import { nowHM } from "@/lib/time";
 
 export default function CheckinModal({
   final = false,
+  earlyEnd = false,
   onSave,
   onAbort,
 }: {
   /** Ostatni check-in sesji — po zapisie od razu podsumowanie. */
   final?: boolean;
+  /** Ręczne, wcześniejsze zakończenie — nieoceniony odcinek dobiegł >50% interwału. */
+  earlyEnd?: boolean;
   onSave: (entry: CheckinEntry) => void;
   onAbort: () => void;
 }) {
@@ -36,15 +39,18 @@ export default function CheckinModal({
     });
   }
 
+  const title = earlyEnd ? "◈ Koniec sesji" : `◈ Check-in${final ? " — ostatni" : ""}`;
+  const sub = earlyEnd
+    ? "Ostatni odcinek jeszcze nieoceniony — możesz go ocenić albo pominąć."
+    : final
+      ? "Czas sesji minął. Oceń ostatni odcinek i zamknij sesję."
+      : "Timer wstrzymany. Krótki status i wracasz do pracy.";
+
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-label="Check-in">
       <div className="panel modal">
-        <p className="modal-title">◈ Check-in{final ? " — ostatni" : ""}</p>
-        <p className="modal-sub">
-          {final
-            ? "Czas sesji minął. Oceń ostatni odcinek i zamknij sesję."
-            : "Timer wstrzymany. Krótki status i wracasz do pracy."}
-        </p>
+        <p className="modal-title">{title}</p>
+        <p className="modal-sub">{sub}</p>
 
         <label className="field-label" htmlFor="doneInput">
           Co udało się zrobić? (opcjonalnie)
@@ -115,9 +121,9 @@ export default function CheckinModal({
           >
             {final ? "Zapisz i zakończ sesję" : "Zapisz i wróć do pracy"}
           </button>
-          {!final && (
+          {(!final || earlyEnd) && (
             <button className="btn btn-ghost" onClick={onAbort}>
-              Zakończ sesję
+              {earlyEnd ? "Zakończ bez oceny" : "Zakończ sesję"}
             </button>
           )}
         </div>

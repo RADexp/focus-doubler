@@ -64,6 +64,10 @@ interface Live {
   checkinOpen: boolean;
   /** Ten check-in jest ostatni — po zapisaniu oceny sesja się kończy. */
   finalCheckin: boolean;
+  /** Czy ten ostatni check-in liczy się jako pełny czas (dla `endSession`). */
+  finalCompleted: boolean;
+  /** Ręczne, wcześniejsze zakończenie — nie naturalny koniec czasu sesji. */
+  earlyEnd: boolean;
   resumed: boolean;
 }
 
@@ -73,6 +77,13 @@ interface Live {
  * przy check-inie co 10 min to próg 30 s.
  */
 const MIN_FINAL_CHECKIN_RATIO = 0.05;
+
+/**
+ * Ręczne "Zakończ" w trakcie sesji: jeśli od ostatniego check-inu minęło
+ * więcej niż ta część interwału, dajemy możliwość oceny tego odcinka
+ * zamiast po cichu go pomijać.
+ */
+const EARLY_END_RATIO_THRESHOLD = 0.5;
 
 /** Blok deep work w trakcie — rama, w której odpalamy kolejne sesje. */
 interface LiveBlock {
@@ -172,6 +183,8 @@ export default function App() {
         paused: true,
         checkinOpen: false,
         finalCheckin: false,
+        finalCompleted: true,
+        earlyEnd: false,
         resumed: true,
       });
       setTask(active.task);
@@ -458,9 +471,42 @@ export default function App() {
       );
     }
     setLive((s) =>
-      s ? { ...s, checkinOpen: true, finalCheckin: timeUp } : s,
+      s
+        ? {
+            ...s,
+            checkinOpen: true,
+            finalCheckin: timeUp,
+            finalCompleted: true,
+            earlyEnd: false,
+          }
+        : s,
     );
   }, [ticking, live, endSession]);
+
+  /** Ręczne "Zakończ": poniżej progu kończy od razu, powyżej — pyta o ocenę odcinka. */
+  const requestEnd = useCallback(() => {
+    const s = liveRef.current;
+    if (!s) return;
+    const intervalSec = s.freqMin * SECONDS_PER_MIN;
+    const elapsedSec = intervalSec - Math.max(0, s.checkinRemainingSec);
+    const pastThreshold =
+      intervalSec > 0 && elapsedSec / intervalSec > EARLY_END_RATIO_THRESHOLD;
+    if (!pastThreshold) {
+      endSession(false);
+      return;
+    }
+    setLive((cur) =>
+      cur
+        ? {
+            ...cur,
+            checkinOpen: true,
+            finalCheckin: true,
+            finalCompleted: false,
+            earlyEnd: true,
+          }
+        : cur,
+    );
+  }, [endSession]);
 
   function setBlockEnabled(v: boolean) {
     setBlockEnabledState(v);
@@ -531,6 +577,8 @@ export default function App() {
       paused: false,
       checkinOpen: false,
       finalCheckin: false,
+      finalCompleted: true,
+      earlyEnd: false,
       resumed: false,
     });
     setPhase("session");
@@ -544,7 +592,7 @@ export default function App() {
     if (s.finalCheckin || s.remainingSec <= 0) {
       liveRef.current = { ...s, entries, checkinOpen: false };
       setLive(liveRef.current);
-      endSession(true);
+      endSession(s.finalCompleted);
       return;
     }
     setLive({
@@ -558,7 +606,8 @@ export default function App() {
   /** Wyjście awaryjne z check-inu: nie wraca do pracy, tylko kończy sesję. */
   function abortFromCheckin() {
     void closeNotifications("checkin");
-    endSession(liveRef.current?.finalCheckin ?? false);
+    const s = liveRef.current;
+    endSession(!!s?.finalCheckin && s.finalCompleted);
   }
 
   function flashHint(msg: string) {
@@ -721,7 +770,7 @@ export default function App() {
               s ? { ...s, paused: !s.paused, resumed: false } : s,
             )
           }
-          onEnd={() => endSession(false)}
+          onEnd={requestEnd}
         />
       )}
 
@@ -773,6 +822,7 @@ export default function App() {
       {phase === "session" && live?.checkinOpen && (
         <CheckinModal
           final={live.finalCheckin}
+          earlyEnd={live.earlyEnd}
           onSave={saveCheckin}
           onAbort={abortFromCheckin}
         />
