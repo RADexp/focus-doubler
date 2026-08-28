@@ -1,4 +1,5 @@
 import type { Entry } from "@/lib/types";
+import RateIcon from "./RateIcon";
 
 export default function LogEntryView({ entry }: { entry: Entry }) {
   if (entry.type === "system") {
@@ -13,14 +14,14 @@ export default function LogEntryView({ entry }: { entry: Entry }) {
   }
 
   const cls = entry.rating === "up" ? "up" : entry.rating === "down" ? "down" : "";
-  const rateSymbol =
-    entry.rating === "up" ? "👍" : entry.rating === "down" ? "👎" : "·";
 
   return (
     <div className={`log-entry ${cls}`}>
       <div className="log-entry-head">
         <span>{entry.time}</span>
-        <span className="rate">{rateSymbol}</span>
+        <span className={`rate ${cls}`}>
+          {entry.rating ? <RateIcon rating={entry.rating} size={14} /> : "·"}
+        </span>
       </div>
       {entry.done && (
         <>

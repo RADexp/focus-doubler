@@ -2,6 +2,8 @@
 
 import type { BlockRecord, SessionRecord } from "@/lib/types";
 import { SECONDS_PER_MIN, hm, hmLeft, hmSpan } from "@/lib/time";
+import RateIcon from "./RateIcon";
+import RateTally from "./RateTally";
 
 /** Ile minut dogrywki uznajemy jeszcze za „zmieścił się w czasie". */
 const OVERTIME_TOLERANCE_MIN = 1;
@@ -76,7 +78,10 @@ export default function BlockEndScreen({
               {up}
               <span className="of">/{rated}</span>
             </div>
-            <div className="lbl">👍 check-inów</div>
+            <div className="lbl">
+              <RateIcon rating="up" size={11} />
+              check-inów
+            </div>
           </div>
         </div>
 
@@ -87,10 +92,11 @@ export default function BlockEndScreen({
               <div className="sess-row" key={s.id}>
                 <span className="when">{hm(new Date(s.startedAt))}</span>
                 <span className="what">{s.task || "Bez tytułu"}</span>
-                <span className="tally">
-                  <span className="up">👍 {s.up || 0}</span>
-                  <span className="down">👎 {s.down || 0}</span>
-                </span>
+                <RateTally
+                  up={s.up || 0}
+                  down={s.down || 0}
+                  className="tally-row"
+                />
               </div>
             ))}
           </>

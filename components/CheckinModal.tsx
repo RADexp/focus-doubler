@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { CheckinEntry, Rating } from "@/lib/types";
+import RateIcon from "./RateIcon";
 import { nowHM } from "@/lib/time";
 
 export default function CheckinModal({
@@ -96,14 +97,16 @@ export default function CheckinModal({
             aria-pressed={rating === "up"}
             onClick={() => setRating((r) => (r === "up" ? null : "up"))}
           >
-            👍 Skupiony
+            <RateIcon rating="up" size={21} />
+            <span>Skupiony</span>
           </button>
           <button
             className={`btn btn-bad${rating === "down" ? " on" : ""}`}
             aria-pressed={rating === "down"}
             onClick={() => setRating((r) => (r === "down" ? null : "down"))}
           >
-            👎 Rozproszony
+            <RateIcon rating="down" size={21} />
+            <span>Rozproszony</span>
           </button>
         </div>
 

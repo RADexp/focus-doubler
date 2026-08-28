@@ -1,5 +1,6 @@
 import type { SessionRecord } from "@/lib/types";
 import EntryList from "./EntryList";
+import RateIcon from "./RateIcon";
 
 export default function SummaryScreen({
   record,
@@ -28,11 +29,17 @@ export default function SummaryScreen({
         <div className="summary-stats">
           <div className="stat-box up">
             <div className="num">{record.up}</div>
-            <div className="lbl">👍 skupiony</div>
+            <div className="lbl">
+              <RateIcon rating="up" size={12} />
+              skupiony
+            </div>
           </div>
           <div className="stat-box down">
             <div className="num">{record.down}</div>
-            <div className="lbl">👎 rozproszony</div>
+            <div className="lbl">
+              <RateIcon rating="down" size={12} />
+              rozproszony
+            </div>
           </div>
         </div>
         <div style={{ marginTop: 18 }}>

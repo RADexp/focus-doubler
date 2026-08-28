@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import type { BlockRecord, SessionRecord } from "@/lib/types";
 import { dateLabel, hm, hmSpan } from "@/lib/time";
 import EntryList from "./EntryList";
+import RateTally from "./RateTally";
 
 /**
  * Wiersz historii: albo blok deep work z sesjami w środku, albo pojedyncza
@@ -65,7 +66,8 @@ function SessionItem({ session }: { session: SessionRecord }) {
       <summary>
         <span className="sess-task">{session.task || "Bez tytułu"}</span>
         <span className="sess-meta">
-          {session.lengthMin} min · 👍{session.up || 0} 👎{session.down || 0}
+          {session.lengthMin} min
+          <RateTally up={session.up || 0} down={session.down || 0} />
         </span>
       </summary>
       <div className="sess-entries">
@@ -188,10 +190,7 @@ export default function History({
           <div className="date-group" key={key}>
             <div className="date-group-head">
               <span>{dateLabel(key)}</span>
-              <span className="tally">
-                <span className="up">👍 {up}</span>
-                &nbsp; <span className="down">👎 {down}</span>
-              </span>
+              <RateTally up={up} down={down} size={15} className="tally-day" />
             </div>
             {toRows(group, blocks).map((row) =>
               row.kind === "session" ? (

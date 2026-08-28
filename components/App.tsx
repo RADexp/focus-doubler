@@ -392,7 +392,7 @@ export default function App() {
     if (completed && notifyRef.current && !document.hasFocus()) {
       void notify(
         "Sesja zakończona",
-        `${s.task} · 👍 ${up} 👎 ${down}`,
+        `${s.task} · skupiony ${up} · rozproszony ${down}`,
         "session-end",
       );
     }

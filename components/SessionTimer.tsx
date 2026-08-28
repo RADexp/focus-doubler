@@ -1,8 +1,8 @@
 import type { CheckinEntry, Entry } from "@/lib/types";
 import { fmt, hm } from "@/lib/time";
+import RateIcon from "./RateIcon";
 
 const URGENT_THRESHOLD_SEC = 60;
-const RATE_SYMBOL: Record<"up" | "down", string> = { up: "👍", down: "👎" };
 
 export default function SessionTimer({
   task,
@@ -91,7 +91,7 @@ export default function SessionTimer({
                 c.rating ? ` ${c.rating}` : ""
               }`}
             >
-              {c.rating ? RATE_SYMBOL[c.rating] : c.i + 1}
+              {c.rating ? <RateIcon rating={c.rating} size={12} /> : c.i + 1}
             </span>
           ))}
         </div>
