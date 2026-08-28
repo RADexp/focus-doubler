@@ -363,7 +363,7 @@ h1.setup-title{font-family:var(--font-sans); font-size:20px; margin:0 0 18px; co
 .br-bar i{display:block; height:2px; background:var(--accent); transition:width .4s linear;}
 .br-foot{margin-top:auto; display:flex; flex-direction:column; align-items:flex-start;}
 
-/* ---- blok deep work: konfigurator na ekranie startu ---- */
+/* ---- konfigurator na ekranie startu: blok deep work i długość sesji ---- */
 .blk-head{display:flex; align-items:center; gap:10px; margin-bottom:14px;}
 .blk-head .group-title{margin:0;}
 .blk-off{
@@ -390,13 +390,14 @@ h1.setup-title{font-family:var(--font-sans); font-size:20px; margin:0 0 18px; co
   color:var(--accent); text-shadow:0 0 22px var(--accent-glow); font-variant-numeric:tabular-nums;
 }
 .step-unit{font-family:var(--font-mono); font-size:10px; letter-spacing:.22em; text-transform:uppercase; color:var(--text-dim);}
-.blk-meta{
+/* Podpis i skróty pod stepperem — wspólne dla bloku i długości sesji. */
+.blk-meta,.step-meta{
   font-family:var(--font-mono); font-size:11.5px; line-height:1.6; color:var(--text-secondary);
   text-align:center; margin-top:14px;
 }
-.blk-meta b{color:var(--text-primary); font-weight:500;}
-.blk-quick{margin-top:14px;}
-.blk-quick .chip{font-size:12.5px; padding:9px 6px; min-width:0;}
+.blk-meta b,.step-meta b{color:var(--text-primary); font-weight:500;}
+.blk-quick,.step-quick{margin-top:14px;}
+.blk-quick .chip,.step-quick .chip{font-size:12.5px; padding:9px 6px; min-width:0;}
 
 .blk-on{
   display:flex; align-items:center; gap:9px; font-family:var(--font-mono); font-size:11.5px;

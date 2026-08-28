@@ -2,6 +2,7 @@
 
 import BlockSetup from "./BlockSetup";
 import Chips from "./Chips";
+import LengthStepper from "./LengthStepper";
 import { hmSpan } from "@/lib/time";
 
 export default function SetupScreen({
@@ -75,13 +76,7 @@ export default function SetupScreen({
           placeholder="np. Rozdział 3 scenariusza — research i pierwszy szkic"
         />
 
-        <div className="group-title">Długość sesji (min)</div>
-        <Chips
-          label="Długość sesji"
-          values={[30, 45, 60]}
-          value={lengthMin}
-          onChange={setLengthMin}
-        />
+        <LengthStepper lengthMin={lengthMin} setLengthMin={setLengthMin} />
 
         <div className="group-title">Częstotliwość check-inów (min)</div>
         <Chips

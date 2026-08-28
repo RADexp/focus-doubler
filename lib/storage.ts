@@ -13,6 +13,7 @@ const BLOCKS_KEY = "focus-doubler:blocks";
 const ACTIVE_BLOCK_KEY = "focus-doubler:active-block";
 const BLOCK_ON_KEY = "focus-doubler:block-on";
 const BLOCK_MIN_KEY = "focus-doubler:block-min";
+const LENGTH_MIN_KEY = "focus-doubler:length-min";
 
 function safeParse<T>(raw: string | null, fallback: T): T {
   if (!raw) return fallback;
@@ -168,6 +169,21 @@ export function loadBlockMin(fallback: number): number {
 export function saveBlockMin(min: number): void {
   try {
     window.localStorage.setItem(BLOCK_MIN_KEY, String(min));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Ostatnio wybrana długość sesji. Granic pilnuje clampLengthMin po stronie App. */
+export function loadLengthMin(fallback: number): number {
+  if (typeof window === "undefined") return fallback;
+  const raw = Number(window.localStorage.getItem(LENGTH_MIN_KEY));
+  return Number.isFinite(raw) && raw > 0 ? raw : fallback;
+}
+
+export function saveLengthMin(min: number): void {
+  try {
+    window.localStorage.setItem(LENGTH_MIN_KEY, String(min));
   } catch {
     /* ignore */
   }

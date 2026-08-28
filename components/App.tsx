@@ -29,6 +29,7 @@ import {
   loadBlockEnabled,
   loadBlockMin,
   loadBlocks,
+  loadLengthMin,
   loadSessions,
   loadSoundEnabled,
   saveActive,
@@ -36,6 +37,7 @@ import {
   saveBlockEnabled,
   saveBlockMin,
   saveBlocks,
+  saveLengthMin,
   loadNotifyEnabled,
   saveNotifyEnabled,
   saveSessions,
@@ -48,6 +50,7 @@ import CheckinModal from "./CheckinModal";
 import History from "./History";
 import SessionScreen from "./SessionScreen";
 import SetupScreen from "./SetupScreen";
+import { clampLengthMin } from "./LengthStepper";
 import SummaryScreen from "./SummaryScreen";
 
 type Phase = "setup" | "session" | "summary" | "break" | "blockEnd";
@@ -102,6 +105,9 @@ interface LiveBlock {
 /** Domyślna długość bloku przy pierwszym uruchomieniu. */
 const DEFAULT_BLOCK_MIN = 120;
 
+/** Domyślna długość sesji, zanim użytkownik wybierze własną. */
+const DEFAULT_LENGTH_MIN = 45;
+
 interface Brk {
   totalSec: number;
   leftSec: number;
@@ -118,7 +124,7 @@ export default function App() {
   const [hint, setHint] = useState("");
 
   const [task, setTask] = useState("");
-  const [lengthMin, setLengthMin] = useState(45);
+  const [lengthMin, setLengthMinState] = useState(DEFAULT_LENGTH_MIN);
   const [freqMin, setFreqMin] = useState(15);
 
   const [live, setLive] = useState<Live | null>(null);
@@ -149,6 +155,7 @@ export default function App() {
     setBlocks(loadBlocks());
     setBlockEnabledState(loadBlockEnabled());
     setBlockMinState(loadBlockMin(DEFAULT_BLOCK_MIN));
+    setLengthMinState(clampLengthMin(loadLengthMin(DEFAULT_LENGTH_MIN)));
     setSoundEnabled(loadSoundEnabled());
     setNotifyEnabled(loadNotifyEnabled() && notifyPermission() === "granted");
     setLoaded(true);
@@ -507,6 +514,12 @@ export default function App() {
         : cur,
     );
   }, [endSession]);
+
+  /** Długość sesji zostaje na kolejny start — jak długość bloku. */
+  function setLengthMin(v: number) {
+    setLengthMinState(v);
+    saveLengthMin(v);
+  }
 
   function setBlockEnabled(v: boolean) {
     setBlockEnabledState(v);

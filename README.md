@@ -52,7 +52,7 @@ po dodaniu aplikacji do ekranu głównego (iOS 16.4+) — w zwykłym Safari nie 
 
 - **Blok deep work** (opcjonalny) — rama na całą sesję pracy: od 1:00 w górę, skokami
   co 30 min. Odlicza nieprzerwanie ponad sesjami i widać go paskiem nad każdym ekranem.
-- **Setup** — zadanie, długość sesji (30/45/60 min), częstotliwość check-inów (10/15/20 min).
+- **Setup** — zadanie, długość sesji (20–60 min co 5, skróty 30 i 45), częstotliwość check-inów (10/15/20 min).
 - **Sesja** — pierścień odlicza czas; co N minut wyskakuje check-in (timer stoi, gra cichy sygnał).
 - **Check-in** — co zrobione / nad czym teraz / notatka + ocena 👍 skupiony albo 👎 rozproszony.
 - **Podsumowanie** — bilans 👍/👎 i pełny dziennik; sesja ląduje w historii pogrupowanej po dniach.
@@ -76,6 +76,7 @@ Zasady bloku, na wypadek gdyby zegary się rozjechały:
 | `focus-doubler:active-block` | blok w trakcie (przeżywa odświeżenie strony) |
 | `focus-doubler:block-on` | czy blok jest włączony na ekranie startu |
 | `focus-doubler:block-min` | ostatnio wybrana długość bloku w minutach |
+| `focus-doubler:length-min` | ostatnio wybrana długość sesji w minutach |
 | `focus-doubler:sound` | czy dźwięk check-inu jest włączony |
 | `focus-doubler:notify` | czy powiadomienia systemowe są włączone |
 
