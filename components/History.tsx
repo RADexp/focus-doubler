@@ -51,11 +51,15 @@ function groupByDate(sessions: SessionRecord[]) {
       const group = [...byDate[key]].sort((a, b) =>
         (b.startedAt || "").localeCompare(a.startedAt || ""),
       );
+      const label = dateLabel(key);
       return {
         key,
+        label,
         group,
         up: group.reduce((n, s) => n + (s.up || 0), 0),
         down: group.reduce((n, s) => n + (s.down || 0), 0),
+        // Dziś i wczoraj są od razu rozwinięte, starsze dni zwinięte.
+        defaultOpen: label === "Dziś" || label === "Wczoraj",
       };
     });
 }
@@ -96,6 +100,16 @@ export default function History({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [note, setNote] = useState("");
+  const [openOverrides, setOpenOverrides] = useState<Record<string, boolean>>(
+    {},
+  );
+
+  function toggleDate(key: string, defaultOpen: boolean) {
+    setOpenOverrides((o) => ({
+      ...o,
+      [key]: !(key in o ? o[key] : defaultOpen),
+    }));
+  }
 
   function flash(msg: string) {
     setNote(msg);
@@ -186,37 +200,71 @@ export default function History({
           Brak zapisanych sesji. Twoja pierwsza pojawi się tutaj.
         </div>
       ) : (
-        groups.map(({ key, group, up, down }) => (
-          <div className="date-group" key={key}>
-            <div className="date-group-head">
-              <span>{dateLabel(key)}</span>
-              <RateTally up={up} down={down} size={15} className="tally-day" />
+        groups.map(({ key, label, group, up, down, defaultOpen }) => {
+          const isOpen = key in openOverrides ? openOverrides[key] : defaultOpen;
+          return (
+            <div className="date-group" key={key}>
+              <button
+                type="button"
+                className="date-group-head"
+                aria-expanded={isOpen}
+                onClick={() => toggleDate(key, defaultOpen)}
+              >
+                <span className="date-group-title">
+                  <svg
+                    className={`date-group-chevron${isOpen ? " open" : ""}`}
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M9 6l6 6-6 6" />
+                  </svg>
+                  {label}
+                  <span className="date-group-count">
+                    {group.length}{" "}
+                    {group.length === 1
+                      ? "sesja"
+                      : group.length < 5
+                        ? "sesje"
+                        : "sesji"}
+                  </span>
+                </span>
+                <RateTally up={up} down={down} size={15} className="tally-day" />
+              </button>
+              {isOpen &&
+                toRows(group, blocks).map((row) =>
+                  row.kind === "session" ? (
+                    <SessionItem key={row.session.id} session={row.session} />
+                  ) : (
+                    <div className="hist-block" key={row.block.id}>
+                      <div className="hist-block-head">
+                        <span>Blok {hmSpan(row.block.plannedMin)}</span>
+                        <span className="hist-block-meta">
+                          {hm(new Date(row.block.startedAt))} →{" "}
+                          {hm(new Date(row.block.endedAt))} ·{" "}
+                          {row.sessions.length}{" "}
+                          {row.sessions.length === 1
+                            ? "sesja"
+                            : row.sessions.length < 5
+                              ? "sesje"
+                              : "sesji"}
+                        </span>
+                      </div>
+                      {row.sessions.map((s) => (
+                        <SessionItem key={s.id} session={s} />
+                      ))}
+                    </div>
+                  ),
+                )}
             </div>
-            {toRows(group, blocks).map((row) =>
-              row.kind === "session" ? (
-                <SessionItem key={row.session.id} session={row.session} />
-              ) : (
-                <div className="hist-block" key={row.block.id}>
-                  <div className="hist-block-head">
-                    <span>Blok {hmSpan(row.block.plannedMin)}</span>
-                    <span className="hist-block-meta">
-                      {hm(new Date(row.block.startedAt))} →{" "}
-                      {hm(new Date(row.block.endedAt))} · {row.sessions.length}{" "}
-                      {row.sessions.length === 1
-                        ? "sesja"
-                        : row.sessions.length < 5
-                          ? "sesje"
-                          : "sesji"}
-                    </span>
-                  </div>
-                  {row.sessions.map((s) => (
-                    <SessionItem key={s.id} session={s} />
-                  ))}
-                </div>
-              ),
-            )}
-          </div>
-        ))
+          );
+        })
       )}
     </div>
   );
