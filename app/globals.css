@@ -83,8 +83,8 @@ body{
   border:1px solid var(--border);
   border-radius:14px;
   padding:24px;
-  margin-bottom:18px;
 }
+.panel:not(.modal){margin-bottom:18px;}
 .panel::before,.panel::after{content:''; position:absolute; width:16px; height:16px; pointer-events:none;}
 .panel::before{top:-1px; left:-1px; border-top:2px solid var(--accent-dim); border-left:2px solid var(--accent-dim); border-top-left-radius:14px;}
 .panel::after{bottom:-1px; right:-1px; border-bottom:2px solid var(--accent-dim); border-right:2px solid var(--accent-dim); border-bottom-right-radius:14px;}
@@ -498,7 +498,8 @@ h1.setup-title{font-family:var(--font-sans); font-size:20px; margin:0 0 18px; co
       calc(36px + env(safe-area-inset-bottom))
       calc(10px + env(safe-area-inset-left));
   }
-  .panel{padding:18px 16px; margin-bottom:14px;}
+  .panel{padding:18px 16px;}
+  .panel:not(.modal){margin-bottom:14px;}
   .modal{padding:20px 18px;}
   h1.setup-title{font-size:18px; margin-bottom:14px;}
   .brand{margin-bottom:16px;}
@@ -519,7 +520,8 @@ h1.setup-title{font-family:var(--font-sans); font-size:20px; margin:0 0 18px; co
 
 @media (max-height:720px){
   body{padding-bottom:calc(24px + env(safe-area-inset-bottom));}
-  .panel{padding:16px; margin-bottom:12px;}
+  .panel{padding:16px;}
+  .panel:not(.modal){margin-bottom:12px;}
   .task-block{padding-bottom:14px;}
   .hero-row{padding:14px 0 2px;}
   .hero-num{font-size:38px;}
