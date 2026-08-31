@@ -10,7 +10,7 @@ import type {
 } from "@/lib/types";
 import { SECONDS_PER_MIN, fmt, hmSpan, nowHM, todayKey } from "@/lib/time";
 import { APP_VERSION } from "@/lib/version";
-import { playChime } from "@/lib/chime";
+import { playChimeBlockEnd, playChimeBreakEnd, playChimeCheckin } from "@/lib/chime";
 import {
   closeNotifications,
   notify,
@@ -258,7 +258,7 @@ export default function App() {
   useEffect(() => {
     if (!block?.expired || blockAlerted.current) return;
     blockAlerted.current = true;
-    if (soundRef.current) playChime();
+    if (soundRef.current) playChimeBlockEnd();
     if (notifyRef.current && !document.hasFocus()) {
       void notify(
         "◈ Koniec bloku deep work",
@@ -285,7 +285,7 @@ export default function App() {
 
   useEffect(() => {
     if (!breakTicking || !brk || brk.leftSec > 0) return;
-    if (soundRef.current) playChime();
+    if (soundRef.current) playChimeBreakEnd();
     if (notifyRef.current && !document.hasFocus()) {
       void notify("◈ Koniec przerwy", "Czas na kolejną sesję skupienia.", "break-end");
     }
@@ -469,7 +469,7 @@ export default function App() {
       }
     }
 
-    if (soundRef.current) playChime();
+    if (soundRef.current) playChimeCheckin();
     if (notifyRef.current && !document.hasFocus()) {
       void notify(
         timeUp ? "◈ Ostatni check-in" : "◈ Check-in",

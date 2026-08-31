@@ -73,6 +73,12 @@ export default function SetupScreen({
           rows={2}
           value={task}
           onChange={(e) => setTask(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              onStart();
+            }
+          }}
           placeholder="np. Rozdział 3 scenariusza — research i pierwszy szkic"
         />
 
