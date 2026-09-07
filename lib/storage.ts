@@ -14,6 +14,7 @@ const ACTIVE_BLOCK_KEY = "focus-doubler:active-block";
 const BLOCK_ON_KEY = "focus-doubler:block-on";
 const BLOCK_MIN_KEY = "focus-doubler:block-min";
 const LENGTH_MIN_KEY = "focus-doubler:length-min";
+const FREQ_MIN_KEY = "focus-doubler:freq-min";
 
 function safeParse<T>(raw: string | null, fallback: T): T {
   if (!raw) return fallback;
@@ -184,6 +185,21 @@ export function loadLengthMin(fallback: number): number {
 export function saveLengthMin(min: number): void {
   try {
     window.localStorage.setItem(LENGTH_MIN_KEY, String(min));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Ostatnio wybrana częstotliwość check-inów. */
+export function loadFreqMin(fallback: number): number {
+  if (typeof window === "undefined") return fallback;
+  const raw = Number(window.localStorage.getItem(FREQ_MIN_KEY));
+  return Number.isFinite(raw) && raw > 0 ? raw : fallback;
+}
+
+export function saveFreqMin(min: number): void {
+  try {
+    window.localStorage.setItem(FREQ_MIN_KEY, String(min));
   } catch {
     /* ignore */
   }

@@ -29,6 +29,7 @@ import {
   loadBlockEnabled,
   loadBlockMin,
   loadBlocks,
+  loadFreqMin,
   loadLengthMin,
   loadSessions,
   loadSoundEnabled,
@@ -37,6 +38,7 @@ import {
   saveBlockEnabled,
   saveBlockMin,
   saveBlocks,
+  saveFreqMin,
   saveLengthMin,
   loadNotifyEnabled,
   saveNotifyEnabled,
@@ -108,6 +110,9 @@ const DEFAULT_BLOCK_MIN = 120;
 /** Domyślna długość sesji, zanim użytkownik wybierze własną. */
 const DEFAULT_LENGTH_MIN = 45;
 
+/** Domyślna częstotliwość check-inów, zanim użytkownik wybierze własną. */
+const DEFAULT_FREQ_MIN = 15;
+
 interface Brk {
   totalSec: number;
   leftSec: number;
@@ -125,7 +130,7 @@ export default function App() {
 
   const [task, setTask] = useState("");
   const [lengthMin, setLengthMinState] = useState(DEFAULT_LENGTH_MIN);
-  const [freqMin, setFreqMin] = useState(15);
+  const [freqMin, setFreqMinState] = useState(DEFAULT_FREQ_MIN);
 
   const [live, setLive] = useState<Live | null>(null);
   const [summary, setSummary] = useState<SessionRecord | null>(null);
@@ -156,6 +161,7 @@ export default function App() {
     setBlockEnabledState(loadBlockEnabled());
     setBlockMinState(loadBlockMin(DEFAULT_BLOCK_MIN));
     setLengthMinState(clampLengthMin(loadLengthMin(DEFAULT_LENGTH_MIN)));
+    setFreqMinState(loadFreqMin(DEFAULT_FREQ_MIN));
     setSoundEnabled(loadSoundEnabled());
     setNotifyEnabled(loadNotifyEnabled() && notifyPermission() === "granted");
     setLoaded(true);
@@ -519,6 +525,12 @@ export default function App() {
   function setLengthMin(v: number) {
     setLengthMinState(v);
     saveLengthMin(v);
+  }
+
+  /** Częstotliwość check-inów zostaje na kolejny start — jak długość sesji. */
+  function setFreqMin(v: number) {
+    setFreqMinState(v);
+    saveFreqMin(v);
   }
 
   function setBlockEnabled(v: boolean) {
