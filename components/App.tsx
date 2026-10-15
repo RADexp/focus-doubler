@@ -769,6 +769,7 @@ export default function App() {
             blockMin={blockMin}
             setBlockMin={setBlockMin}
             onStart={startSession}
+            sessions={sessions}
           />
           <History
             sessions={sessions}

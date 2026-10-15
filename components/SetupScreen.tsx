@@ -4,6 +4,24 @@ import BlockSetup from "./BlockSetup";
 import Chips from "./Chips";
 import LengthStepper from "./LengthStepper";
 import { hmSpan } from "@/lib/time";
+import type { SessionRecord } from "@/lib/types";
+
+const RECENT_LIMIT = 5;
+
+/** Ostatnie unikalne tytuły sesji, od najnowszych — do szybkiego wstawienia. */
+function recentTasks(sessions: SessionRecord[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const s of [...sessions].sort((a, b) => b.id - a.id)) {
+    const t = s.task.trim();
+    const key = t.toLowerCase();
+    if (!t || seen.has(key)) continue;
+    seen.add(key);
+    out.push(t);
+    if (out.length === RECENT_LIMIT) break;
+  }
+  return out;
+}
 
 export default function SetupScreen({
   task,
@@ -18,6 +36,7 @@ export default function SetupScreen({
   blockMin,
   setBlockMin,
   onStart,
+  sessions,
 }: {
   task: string;
   setTask: (v: string) => void;
@@ -32,8 +51,19 @@ export default function SetupScreen({
   blockMin: number;
   setBlockMin: (v: number) => void;
   onStart: () => void;
+  sessions: SessionRecord[];
 }) {
   const startsBlock = blockEnabled && !blockActive;
+  const recent = task.trim() ? [] : recentTasks(sessions);
+
+  const pickRecent = (t: string) => {
+    setTask(t);
+    const el = document.getElementById("taskInput") as HTMLTextAreaElement | null;
+    if (el) {
+      el.focus();
+      requestAnimationFrame(() => el.setSelectionRange(t.length, t.length));
+    }
+  };
 
   return (
     <>
@@ -81,6 +111,22 @@ export default function SetupScreen({
           }}
           placeholder="np. Rozdział 3 scenariusza — research i pierwszy szkic"
         />
+        {recent.length > 0 && (
+          <div className="recent" role="group" aria-label="Ostatnie zadania">
+            <span className="recent-lbl">Ostatnio</span>
+            {recent.map((t) => (
+              <button
+                key={t}
+                type="button"
+                className="recent-chip"
+                title={t}
+                onClick={() => pickRecent(t)}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        )}
 
         <LengthStepper lengthMin={lengthMin} setLengthMin={setLengthMin} />
 
