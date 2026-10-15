@@ -1,18 +1,30 @@
+"use client";
+
+import { useState } from "react";
 import type { SessionRecord } from "@/lib/types";
+import Chips from "./Chips";
 import EntryList from "./EntryList";
 import RateIcon from "./RateIcon";
+
+/** Dostępne długości dogrywki, w minutach. */
+const EXTEND_OPTIONS = [10, 15, 20, 30];
 
 export default function SummaryScreen({
   record,
   blockExpired,
+  onExtend,
   onBreak,
 }: {
   record: SessionRecord;
   /** Czas bloku wyczerpał się w trakcie tej sesji — dalej idzie się do podsumowania bloku. */
   blockExpired: boolean;
+  /** Dogrywka: rozciąga tę sesję o podaną liczbę minut. */
+  onExtend: (min: number) => void;
   /** Dalej: ekran przerwy (stamtąd start kolejnej sesji). */
   onBreak: () => void;
 }) {
+  const [extraMin, setExtraMin] = useState(EXTEND_OPTIONS[0]);
+
   return (
     <>
       <div className="panel">
@@ -41,6 +53,24 @@ export default function SummaryScreen({
               rozproszony
             </div>
           </div>
+        </div>
+        <div className="extend">
+          <div className="extend-title">Chcesz jeszcze trochę?</div>
+          <p className="extend-hint">
+            Dodaj dogrywkę do tej sesji — wynik dopisze się do bieżącego.
+          </p>
+          <Chips
+            values={EXTEND_OPTIONS}
+            value={extraMin}
+            onChange={setExtraMin}
+            label="Długość dogrywki w minutach"
+          />
+          <button
+            className="btn btn-ghost extend-btn"
+            onClick={() => onExtend(extraMin)}
+          >
+            + Dodaj {extraMin} min
+          </button>
         </div>
         <div style={{ marginTop: 18 }}>
           <button className="btn btn-primary" onClick={onBreak}>

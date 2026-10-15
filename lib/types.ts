@@ -43,6 +43,8 @@ export interface ActiveSession {
   remainingSec: number;
   checkinRemainingSec: number;
   entries: Entry[];
+  /** Długość bieżącego odcinka po dogrywce (brak = cała `lengthMin`). */
+  segmentMin?: number;
   savedAt: number;
 }
 

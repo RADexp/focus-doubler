@@ -63,6 +63,8 @@ interface Live {
   freqMin: number;
   startedAt: string;
   entries: Entry[];
+  /** Długość bieżącego odcinka — po dogrywce krótsza niż `lengthMin`. */
+  segmentMin?: number;
   remainingSec: number;
   checkinRemainingSec: number;
   paused: boolean;
@@ -191,6 +193,7 @@ export default function App() {
         freqMin: active.freqMin,
         startedAt: active.startedAt,
         entries: active.entries || [],
+        segmentMin: active.segmentMin,
         remainingSec: active.remainingSec,
         checkinRemainingSec: active.checkinRemainingSec,
         paused: true,
@@ -312,6 +315,7 @@ export default function App() {
         remainingSec: s.remainingSec,
         checkinRemainingSec: s.checkinRemainingSec,
         entries: s.entries,
+        segmentMin: s.segmentMin,
         savedAt: Date.now(),
       };
       saveActive(snapshot);
@@ -541,6 +545,56 @@ export default function App() {
   function setBlockMin(v: number) {
     setBlockMinState(v);
     saveBlockMin(v);
+  }
+
+  /**
+   * Dogrywka: zamiast nowej sesji rozciągamy właśnie zakończoną. Rekord wraca
+   * z historii do trwającej sesji, a jej wynik dopisze się przy kolejnym końcu.
+   */
+  function extendSession(min: number) {
+    const r = summary;
+    if (!r) return;
+    const rest = sessions.filter((x) => x.id !== r.id);
+    saveSessions(rest);
+    setSessions(rest);
+
+    const b = blockRef.current;
+    if (b && b.sessionIds.includes(r.id)) {
+      const next: LiveBlock = {
+        ...b,
+        sessionIds: b.sessionIds.filter((id) => id !== r.id),
+        marks: b.marks.slice(0, -1),
+      };
+      blockRef.current = next;
+      setBlock(next);
+    }
+
+    const entries: Entry[] = [
+      ...r.entries.slice(0, -1),
+      {
+        type: "system",
+        time: nowHM(),
+        note: `Sesja przedłużona o ${min} min.`,
+      },
+    ];
+    setLive({
+      task: r.task,
+      lengthMin: r.lengthMin + min,
+      freqMin: r.checkinFreqMin,
+      startedAt: r.startedAt,
+      entries,
+      segmentMin: min,
+      remainingSec: min * SECONDS_PER_MIN,
+      checkinRemainingSec: r.checkinFreqMin * SECONDS_PER_MIN,
+      paused: false,
+      checkinOpen: false,
+      finalCheckin: false,
+      finalCompleted: true,
+      earlyEnd: false,
+      resumed: false,
+    });
+    setSummary(null);
+    setPhase("session");
   }
 
   /** Start przerwy o zadanej długości. */
@@ -783,7 +837,7 @@ export default function App() {
       {phase === "session" && live && (
         <SessionScreen
           task={live.task}
-          totalSec={live.lengthMin * SECONDS_PER_MIN}
+          totalSec={(live.segmentMin ?? live.lengthMin) * SECONDS_PER_MIN}
           remainingSec={live.remainingSec}
           checkinRemainingSec={live.checkinRemainingSec}
           freqMin={live.freqMin}
@@ -804,6 +858,7 @@ export default function App() {
         <SummaryScreen
           record={summary}
           blockExpired={!!block?.expired}
+          onExtend={extendSession}
           onBreak={() => {
             if (block?.expired) {
               closeBlock();
